@@ -151,8 +151,7 @@ button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px sol
   cursor: default;
 }
 .row.sub .to { color: color-mix(in srgb, var(--accent) 75%, transparent); }
-.footer { padding: 20px 16px; text-align: center; font-size: 12px; color: var(--muted); line-height: 1.7; }
-.footer a { color: inherit; }
+.footer { padding: 14px 16px; text-align: center; font-size: 12px; color: var(--muted); line-height: 1.7; }
 .scalebar {
   display: flex;
   align-items: center;
@@ -233,7 +232,6 @@ button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px sol
 .info-body li { margin-bottom: 4px; }
 .info-body a { color: var(--accent); }
 .info-body .small { color: var(--muted); font-size: 12px; }
-.footer .link-btn { background: none; border: 0; padding: 0; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
 @media (prefers-reduced-motion: no-preference) {
   .row, .banner { transition: background 0.15s; }
   .refresh.busy { animation: spin 1s linear infinite; }
@@ -404,7 +402,8 @@ function render() {
       for (let j = 1; j < 10; j++) html += row(v + (j * state.scale) / 10, r, true);
     }
   }
-  html += `<div class="footer">${r ? `1 ${state.from} = ${nf(4).format(r)} ${state.to}<br>` : ""}Kurse: Europäische Zentralbank über <a href="https://frankfurter.dev" target="_blank" rel="noopener">frankfurter.dev</a><br>Code geschrieben von Claude, einer KI von Anthropic<br><button class="link-btn" data-open-info>Info, Quellen und Haftung</button></div>`;
+  // Quellen, KI-Hinweis und Haftung stehen im Info-Fenster (ⓘ); hier nur der aktuelle Kurs.
+  if (r) html += `<div class="footer">1 ${state.from} = ${nf(4).format(r)} ${state.to}</div>`;
   $("table").innerHTML = html;
 
   $("scaleLabel").textContent = `Schritte à ${plain.format(state.scale)}`;
@@ -459,16 +458,29 @@ $("table").addEventListener("keydown", (e) => {
   if ((e.key === "Enter" || e.key === " ") && e.target.matches(".row[data-v]")) { e.preventDefault(); e.target.click(); }
 });
 
-// Wischen: links ×10, rechts ÷10
-let touchStart = null;
-$("app").addEventListener("touchstart", (e) => { touchStart = e.touches[0]; }, { passive: true });
+// Wischen: links ×10, rechts ÷10. Nach den ersten Millimetern wird die Richtung festgelegt; bei einer
+// waagerechten Geste wird das senkrechte Scrollen blockiert, damit die Zahlen nicht mitrutschen.
+const AXIS_LOCK_PX = 8, SWIPE_PX = 50;
+let gesture = null;
+$("app").addEventListener("touchstart", (e) => {
+  const t = e.touches[0];
+  gesture = e.touches.length === 1 ? { x: t.clientX, y: t.clientY, axis: null } : null;
+}, { passive: true });
+$("app").addEventListener("touchmove", (e) => {
+  if (!gesture || e.touches.length !== 1) return;
+  const t = e.touches[0];
+  const dx = t.clientX - gesture.x, dy = t.clientY - gesture.y;
+  if (!gesture.axis && Math.hypot(dx, dy) >= AXIS_LOCK_PX) gesture.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+  if (gesture.axis === "x" && e.cancelable) e.preventDefault();
+}, { passive: false });
 $("app").addEventListener("touchend", (e) => {
-  if (!touchStart) return;
-  const t = e.changedTouches[0];
-  const dx = t.clientX - touchStart.clientX, dy = t.clientY - touchStart.clientY;
-  touchStart = null;
-  if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) setScale(dx < 0 ? 10 : 0.1);
+  if (!gesture) return;
+  const dx = e.changedTouches[0].clientX - gesture.x;
+  const horizontal = gesture.axis === "x";
+  gesture = null;
+  if (horizontal && Math.abs(dx) > SWIPE_PX) setScale(dx < 0 ? 10 : 0.1);
 });
+$("app").addEventListener("touchcancel", () => { gesture = null; });
 document.addEventListener("keydown", (e) => {
   if (!$("infoPanel").hidden) { if (e.key === "Escape") closeInfo(); return; }
   if (!$("picker").hidden) { if (e.key === "Escape") closePicker(); return; }
@@ -499,7 +511,6 @@ function closeInfo() { $("infoPanel").hidden = true; }
 $("infoBtn").onclick = openInfo;
 $("closeInfo").onclick = closeInfo;
 $("infoPanel").addEventListener("click", (e) => { if (e.target.id === "infoPanel") closeInfo(); });
-$("table").addEventListener("click", (e) => { if (e.target.closest("[data-open-info]")) openInfo(); });
 caches?.keys?.().then((keys) => { $("appVersion").textContent = `Version: ${keys.find((k) => k.startsWith("umrechner-")) || "–"}`; }).catch(() => {});
 function renderOptions() {
   const q = $("search").value.trim().toLowerCase();
