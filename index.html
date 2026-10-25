@@ -293,8 +293,8 @@ button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px sol
 .option .name { color: var(--muted); font-size: 12px; display: block; }
 .option .check { margin-left: auto; flex: none; width: 14px; text-align: right; color: var(--accent); }
 .option { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
-/* Angeheftet: kleiner Punkt in der Akzentfarbe */
-.option .pin { margin-left: auto; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+/* Angeheftet: Punkt in der Akzentfarbe, so groß wie das Häkchen (≈ 0,66 em) und mit der Schrift skaliert */
+.option .pin { margin-left: auto; flex: none; width: 0.66em; height: 0.66em; border-radius: 50%; background: var(--accent); }
 .option .pin + .check { margin-left: 10px; }
 .picker-hint { margin: -2px 0 6px; font-size: 11px; color: var(--muted); }
 .options-label { padding: 10px 4px 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
