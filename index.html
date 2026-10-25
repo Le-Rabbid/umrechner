@@ -1,0 +1,513 @@
+<!doctype html>
+<!-- Umrechner · Code geschrieben von Claude (KI-Modell von Anthropic), siehe README.md. -->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Umrechner</title>
+<meta name="generator" content="Claude (Anthropic)">
+<meta name="description" content="Währungsrechner mit EZB-Kursen – runde Beträge auf einen Blick, funktioniert auch offline.">
+<meta name="theme-color" content="#1C1D1F">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Umrechner">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<style>
+/* Layout: eine schmale Spalte wie die iPhone-App – Kopfzeile, Kurstabelle, Schrittleiste. Bewusst nur dunkel. */
+:root {
+  --bg: #1C1D1F;
+  --surface: #28292C;
+  --line: rgba(255, 255, 255, 0.07);
+  --text: #EAE8E2;
+  --muted: rgba(234, 232, 226, 0.5);
+  --accent: #8FBEA8;
+  --warning: #E6B875;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  display: flex;
+  justify-content: center;
+}
+.app {
+  width: 100%;
+  max-width: 440px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-y;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-block: 8px 10px;
+}
+header .spacer { flex: 1; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  color: var(--text);
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 14px;
+  font: 600 16px var(--font);
+  cursor: pointer;
+}
+.chip .flag { font-size: 20px; line-height: 1; }
+.chip .chev { color: var(--muted); font-size: 11px; }
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font-size: 20px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.icon-btn svg { width: 20px; height: 20px; }
+#locateBtn { color: var(--accent); width: 36px; }
+button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.stand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding-bottom: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.refresh { color: var(--accent); font-size: 17px; width: 34px; height: 34px; }
+.refresh:disabled { cursor: default; opacity: 0.6; }
+.notice { padding: 0 8px 8px; font-size: 12px; color: var(--muted); text-align: center; }
+.notice.error { color: var(--warning); }
+.banner {
+  margin-inline: -16px;
+  padding: 8px 16px;
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--warning);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+.table { flex: 1; overflow-y: auto; margin-inline: -16px; overscroll-behavior: contain; }
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 58px;
+  padding-inline: 24px;
+  border-bottom: 1px solid var(--line);
+  font-size: 25px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.row .to { color: var(--accent); }
+.row.sub {
+  min-height: 40px;
+  padding-left: 40px;
+  font-size: 18px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: default;
+}
+.row.sub .to { color: color-mix(in srgb, var(--accent) 75%, transparent); }
+.footer { padding: 20px 16px; text-align: center; font-size: 12px; color: var(--muted); line-height: 1.7; }
+.footer a { color: inherit; }
+.scalebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--line);
+  margin-inline: -16px;
+  padding: 4px 12px calc(4px + env(safe-area-inset-bottom, 0px));
+  font-size: 13px;
+  color: var(--muted);
+}
+.scalebar .icon-btn { color: var(--accent); font-size: 26px; }
+.scalebar .icon-btn:disabled { color: rgba(234, 232, 226, 0.2); cursor: default; }
+.hint { font-size: 11px; opacity: 0.8; }
+@media (hover: hover) {
+  .row:not(.sub):hover { background: rgba(255, 255, 255, 0.025); }
+  .icon-btn:hover, .chip:hover { filter: brightness(1.15); }
+}
+
+/* Währungsauswahl */
+.picker {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 20;
+}
+.sheet {
+  width: 100%;
+  max-width: 440px;
+  max-height: 80%;
+  background: var(--bg);
+  border-radius: 20px 20px 0 0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px max(16px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(16px, env(safe-area-inset-left, 0px));
+}
+@media (min-width: 600px) { .picker { align-items: center; } .sheet { border-radius: 20px; max-height: 70%; } }
+.sheet-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.sheet-head h2 { flex: 1; margin: 0; font-size: 17px; font-weight: 600; }
+#search {
+  width: 100%;
+  background: var(--surface);
+  border: 0;
+  border-radius: 10px;
+  color: var(--text);
+  font: 16px var(--font);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.options { overflow-y: auto; }
+.option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  padding: 10px 4px;
+  font: 15px var(--font);
+  text-align: left;
+  cursor: pointer;
+}
+.option .flag { font-size: 22px; }
+.option .name { color: var(--muted); font-size: 12px; display: block; }
+.option .check { margin-left: auto; color: var(--accent); }
+@media (prefers-reduced-motion: no-preference) {
+  .row, .banner { transition: background 0.15s; }
+  .refresh.busy { animation: spin 1s linear infinite; }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <header>
+    <button class="icon-btn" id="locateBtn" aria-label="Währung des aktuellen Landes verwenden" title="Land erkennen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>
+    </button>
+    <button class="chip" id="fromBtn" aria-label="Ausgangswährung ändern"></button>
+    <span class="spacer"></span>
+    <button class="icon-btn" id="swapBtn" aria-label="Währungen tauschen" title="Tauschen">⇄</button>
+    <span class="spacer"></span>
+    <button class="chip" id="toBtn" aria-label="Zielwährung ändern"></button>
+  </header>
+  <div class="stand">
+    <span id="standText"></span>
+    <button class="icon-btn refresh" id="refreshBtn" aria-label="Kurse aktualisieren" title="Kurse aktualisieren">↻</button>
+  </div>
+  <div class="notice" id="notice" role="status" hidden></div>
+  <div class="banner" id="banner" hidden></div>
+  <div class="table" id="table" role="list"></div>
+  <div class="scalebar">
+    <button class="icon-btn" id="downBtn" aria-label="Beträge durch zehn" title="÷10 (←)">‹</button>
+    <div style="text-align:center">
+      <div id="scaleLabel"></div>
+      <div class="hint">wischen oder ← →</div>
+    </div>
+    <button class="icon-btn" id="upBtn" aria-label="Beträge mal zehn" title="×10 (→)">›</button>
+  </div>
+</div>
+
+<div class="picker" id="picker" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
+    <div class="sheet-head">
+      <h2 id="pickerTitle">Währung</h2>
+      <button class="icon-btn" id="closePicker" aria-label="Schließen">✕</button>
+    </div>
+    <input id="search" type="search" placeholder="Franken, USD, Yen …" autocomplete="off">
+    <div class="options" id="options"></div>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script>
+const RATES_URL = "https://api.frankfurter.dev/v1/latest?base=EUR";
+const POPULAR = ["EUR", "USD", "CHF", "GBP", "JPY"];
+const MIN_SCALE = 1, MAX_SCALE = 1e6;
+const REFRESH_AFTER_MS = 60 * 60 * 1000; // EZB-Kurse ändern sich einmal pro Werktag; stündlich nachsehen reicht
+
+const nf = (digits) => new Intl.NumberFormat("de-DE", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+const plain = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2 });
+const displayNames = (type) => { try { return new Intl.DisplayNames(["de"], { type }); } catch { return null; } };
+const currencyNames = displayNames("currency");
+const regionNames = displayNames("region");
+
+function store(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
+function load(key, fallback) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; } }
+
+const state = {
+  from: load("from", "EUR"),
+  to: load("to", "USD"),
+  scale: load("scale", 1),
+  expanded: null,
+  rates: load("rates", null) || FALLBACK,
+  failed: false,   // letzter Ladeversuch gescheitert → Offline-Hinweis
+  picking: null,
+};
+
+const flag = (code) => code.slice(0, 2).toUpperCase().replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)));
+const currencyName = (code) => (currencyNames && currencyNames.of(code)) || code;
+const fractionDigits = (code) => new Intl.NumberFormat("de-DE", { style: "currency", currency: code }).resolvedOptions().maximumFractionDigits;
+const currencies = () => [state.rates.base, ...Object.keys(state.rates.rates)].sort();
+const $ = (id) => document.getElementById(id);
+
+function rate(from, to) {
+  const r = (c) => (c === state.rates.base ? 1 : state.rates.rates[c]);
+  const a = r(from), b = r(to);
+  return a && b ? b / a : null;
+}
+function formatResult(value, code) {
+  return nf(value >= 1000 ? 0 : fractionDigits(code)).format(value);
+}
+function formatDate(iso, withTime) {
+  const d = new Date(iso.length === 10 ? iso + "T12:00:00" : iso);
+  return d.toLocaleString("de-DE", withTime
+    ? { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }
+    : { day: "numeric", month: "short", year: "numeric" });
+}
+
+// ---- Darstellung ----
+
+function render() {
+  $("fromBtn").innerHTML = `<span class="flag">${flag(state.from)}</span>${state.from}<span class="chev">▾</span>`;
+  $("toBtn").innerHTML = `<span class="flag">${flag(state.to)}</span>${state.to}<span class="chev">▾</span>`;
+
+  $("standText").textContent = `Kurse vom ${formatDate(state.rates.date)}`
+    + (state.rates.fetchedAt ? ` · abgerufen ${formatDate(state.rates.fetchedAt, true)}` : "");
+
+  // Warnung, solange nicht mit aktuellen Kursen gerechnet wird.
+  const banner = $("banner");
+  const ageDays = (Date.now() - new Date(state.rates.date + "T16:00:00").getTime()) / 864e5;
+  if (!navigator.onLine || state.failed) {
+    const stand = formatDate(state.rates.fetchedAt || state.rates.date, Boolean(state.rates.fetchedAt));
+    banner.textContent = `⚠︎ Offline – gespeicherte Kurse vom ${stand}`;
+    banner.hidden = false;
+  } else if (ageDays > 4) {
+    banner.textContent = `⚠︎ Kurse vom ${formatDate(state.rates.date)} – nicht mehr aktuell`;
+    banner.hidden = false;
+  } else {
+    banner.hidden = true;
+  }
+
+  const r = rate(state.from, state.to);
+  let html = "";
+  for (let i = 1; i <= 10; i++) {
+    const v = i * state.scale;
+    html += row(v, r, false);
+    if (state.expanded === v) {
+      for (let j = 1; j < 10; j++) html += row(v + (j * state.scale) / 10, r, true);
+    }
+  }
+  html += `<div class="footer">${r ? `1 ${state.from} = ${nf(4).format(r)} ${state.to}<br>` : ""}Kurse: Europäische Zentralbank über <a href="https://frankfurter.dev" target="_blank" rel="noopener">frankfurter.dev</a><br>Code geschrieben von Claude, einer KI von Anthropic</div>`;
+  $("table").innerHTML = html;
+
+  $("scaleLabel").textContent = `Schritte à ${plain.format(state.scale)}`;
+  $("downBtn").disabled = state.scale <= MIN_SCALE;
+  $("upBtn").disabled = state.scale >= MAX_SCALE;
+}
+
+function row(value, r, sub) {
+  const result = r ? formatResult(value * r, state.to) : "–";
+  const attrs = sub ? `class="row sub" role="listitem"` : `class="row" role="listitem" tabindex="0" data-v="${value}"`;
+  return `<div ${attrs}><span>${plain.format(value)}</span><span class="to">${result}</span></div>`;
+}
+
+let noticeTimer;
+function showNotice(text, isError = false) {
+  const el = $("notice");
+  el.className = "notice" + (isError ? " error" : "");
+  el.textContent = text;
+  el.hidden = false;
+  clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => { el.hidden = true; }, 5000);
+}
+
+// ---- Bedienung ----
+
+function setScale(factor) {
+  const next = Math.round(state.scale * factor);
+  if (next < MIN_SCALE || next > MAX_SCALE || next === state.scale) return;
+  state.scale = next;
+  state.expanded = null;
+  store("scale", next);
+  render();
+}
+
+function setCurrency(target, code) {
+  const other = target === "from" ? "to" : "from";
+  if (state[other] === code) state[other] = state[target];
+  state[target] = code;
+  store("from", state.from);
+  store("to", state.to);
+  render();
+}
+
+$("table").addEventListener("click", (e) => {
+  const el = e.target.closest(".row[data-v]");
+  if (!el) return;
+  const v = Number(el.dataset.v);
+  state.expanded = state.expanded === v ? null : v;
+  render();
+});
+$("table").addEventListener("keydown", (e) => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches(".row[data-v]")) { e.preventDefault(); e.target.click(); }
+});
+
+// Wischen: links ×10, rechts ÷10
+let touchStart = null;
+$("app").addEventListener("touchstart", (e) => { touchStart = e.touches[0]; }, { passive: true });
+$("app").addEventListener("touchend", (e) => {
+  if (!touchStart) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - touchStart.clientX, dy = t.clientY - touchStart.clientY;
+  touchStart = null;
+  if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) setScale(dx < 0 ? 10 : 0.1);
+});
+document.addEventListener("keydown", (e) => {
+  if (!$("picker").hidden) { if (e.key === "Escape") closePicker(); return; }
+  if (e.key === "ArrowRight") setScale(10);
+  if (e.key === "ArrowLeft") setScale(0.1);
+});
+
+$("upBtn").onclick = () => setScale(10);
+$("downBtn").onclick = () => setScale(0.1);
+$("swapBtn").onclick = () => setCurrency("from", state.to);
+
+// Währungsauswahl
+function openPicker(target) {
+  state.picking = target;
+  $("pickerTitle").textContent = target === "from" ? "Von Währung" : "In Währung";
+  $("search").value = "";
+  renderOptions();
+  $("picker").hidden = false;
+  $("search").focus();
+}
+function closePicker() { $("picker").hidden = true; state.picking = null; }
+function renderOptions() {
+  const q = $("search").value.trim().toLowerCase();
+  const list = currencies();
+  const ordered = [...POPULAR.filter((c) => list.includes(c)), ...list.filter((c) => !POPULAR.includes(c))];
+  const selected = state[state.picking];
+  $("options").innerHTML = ordered
+    .filter((c) => !q || c.toLowerCase().includes(q) || currencyName(c).toLowerCase().includes(q))
+    .map((c) => `<button class="option" data-code="${c}"><span class="flag">${flag(c)}</span><span>${c}<span class="name">${currencyName(c)}</span></span>${c === selected ? '<span class="check">✓</span>' : ""}</button>`)
+    .join("");
+}
+$("fromBtn").onclick = () => openPicker("from");
+$("toBtn").onclick = () => openPicker("to");
+$("closePicker").onclick = closePicker;
+$("picker").addEventListener("click", (e) => { if (e.target.id === "picker") closePicker(); });
+$("search").addEventListener("input", renderOptions);
+$("options").addEventListener("click", (e) => {
+  const btn = e.target.closest(".option");
+  if (!btn) return;
+  setCurrency(state.picking, btn.dataset.code);
+  closePicker();
+});
+
+// ---- Land erkennen (über die Zeitzone des Geräts: ohne Standortfreigabe, ohne fremden Dienst, offline) ----
+
+$("locateBtn").onclick = () => {
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const country = TZMAP.tz[zone];
+  const currency = country && TZMAP.cur[country];
+  if (!currency) {
+    showNotice("Land konnte nicht erkannt werden.", true);
+    return;
+  }
+  const countryName = (regionNames && regionNames.of(country)) || country;
+  if (!currencies().includes(currency)) {
+    showNotice(`${countryName}: ${currency} wird von der EZB nicht geführt.`, true);
+    return;
+  }
+  setCurrency("from", currency);
+  showNotice(`${flag(currency)} ${countryName} · ${currency}`);
+};
+
+// ---- Kurse laden ----
+
+function isValidRates(data) {
+  return data && /^\d{4}-\d{2}-\d{2}$/.test(data.date || "") && data.rates && Object.keys(data.rates).length >= 5;
+}
+
+let loading = false;
+async function refresh({ manual = false } = {}) {
+  if (loading) return;
+  loading = true;
+  $("refreshBtn").disabled = true;
+  $("refreshBtn").classList.add("busy");
+  try {
+    const signal = typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(15000) : undefined;
+    const response = await fetch(RATES_URL, { cache: "no-store", signal });
+    if (!response.ok) throw new Error(String(response.status));
+    const data = await response.json();
+    if (!isValidRates(data)) throw new Error("Ungültige Antwort");
+    state.rates = { base: data.base || "EUR", date: data.date, rates: data.rates, fetchedAt: new Date().toISOString() };
+    state.failed = false;
+    store("rates", state.rates);
+    if (manual) showNotice(`Aktualisiert – Kurse vom ${formatDate(state.rates.date)}`);
+  } catch {
+    state.failed = true;
+    if (manual) showNotice("Keine Verbindung – es gelten die gespeicherten Kurse.", true);
+  } finally {
+    loading = false;
+    $("refreshBtn").disabled = false;
+    $("refreshBtn").classList.remove("busy");
+    render();
+  }
+}
+
+function refreshIfStale() {
+  const fetched = state.rates.fetchedAt ? Date.parse(state.rates.fetchedAt) : 0;
+  if (state.failed || Date.now() - fetched > REFRESH_AFTER_MS) refresh();
+}
+
+$("refreshBtn").onclick = () => refresh({ manual: true });
+window.addEventListener("online", () => refresh());
+window.addEventListener("offline", render);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") refreshIfStale(); });
+
+render();
+refreshIfStale();
+
+// Offline-Fähigkeit: App-Dateien im Service Worker speichern
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+</script>
+</body>
+</html>

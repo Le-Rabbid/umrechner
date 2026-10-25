@@ -1,0 +1,18 @@
+{
+  "name": "Umrechner",
+  "short_name": "Umrechner",
+  "description": "Währungsrechner mit EZB-Kursen – runde Beträge auf einen Blick, funktioniert auch offline.",
+  "lang": "de",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1C1D1F",
+  "theme_color": "#1C1D1F",
+  "categories": ["finance", "utilities"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
