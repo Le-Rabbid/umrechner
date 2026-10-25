@@ -23,6 +23,10 @@
   var standalone = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
   if (!standalone) return;
   document.documentElement.classList.add("fit-pending");
+  // Das Logo des Ladebildschirms steht in der Mitte des Bildschirms, nicht des Fensters: Die Fensterhöhe
+  // korrigiert iOS beim Start manchmal noch, die Bildschirmhöhe ist fest – so springt das Logo nicht.
+  var screenHeight = Math.max(screen.width, screen.height);
+  document.documentElement.style.setProperty("--screen-center", screenHeight / 2 + "px");
   var stored = null;
   try { stored = localStorage.getItem("missingHeight"); } catch (e) {}
   if (stored !== null) document.documentElement.style.setProperty("--missing-height", stored + "px");
@@ -46,17 +50,26 @@
 /* Ladebildschirm bei jedem Start der Home-Bildschirm-App (nicht beim Zurückholen aus dem Hintergrund) */
 #splash {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: -200px; /* reicht über den Rand hinaus, damit unten nie ein Streifen frei bleibt */
   z-index: 50;
   display: none;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
   background: var(--bg);
   color: var(--muted);
   font: 600 15px var(--font);
   transition: opacity 0.25s ease;
+}
+.splash-content {
+  position: absolute;
+  left: 50%;
+  top: var(--screen-center, 50%);
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
 }
 #splash img { width: 96px; height: 96px; border-radius: 22px; }
 html.fit-pending #splash, html.fit-fading #splash { display: flex; }
@@ -302,7 +315,7 @@ button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px sol
 </style>
 </head>
 <body>
-<div id="splash" aria-hidden="true"><img src="icons/icon-192.png" alt="">Umrechner</div>
+<div id="splash" aria-hidden="true"><div class="splash-content"><img src="icons/icon-192.png" alt="">Umrechner</div></div>
 
 <div class="app" id="app">
   <header>
