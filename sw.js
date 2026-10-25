@@ -1,8 +1,10 @@
 // Code geschrieben von Claude (KI-Modell von Anthropic), siehe README.md.
 // Service Worker: speichert die App-Dateien, damit der Umrechner auch ohne Internet startet.
 // Die Kurse selbst verwaltet die App (localStorage); Anfragen an die Kurs-API laufen hier nicht durch.
-// Bei jeder Änderung an den App-Dateien VERSION erhöhen, damit installierte Apps das Update laden.
-const VERSION = "umrechner-v10";
+// Bei jeder Änderung an den App-Dateien APP_VERSION erhöhen (Semantic Versioning: Fehlerkorrektur 1.0.1,
+// neue Funktion 1.1.0, großer Umbau 2.0.0) – dann laden installierte Apps das Update.
+const APP_VERSION = "1.0.0";
+const VERSION = `umrechner-${APP_VERSION}`;
 const FILES = [
   "./",
   "./index.html",

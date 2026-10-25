@@ -15,6 +15,19 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
+<script>
+// Läuft vor dem ersten Zeichnen: In der Home-Bildschirm-App den gemerkten Höhenausgleich sofort setzen
+// (siehe fitToScreen), damit nichts springt. Gibt es noch keinen (allererster Start), kurz den
+// Ladebildschirm zeigen, bis die Höhe gemessen ist.
+(function () {
+  var standalone = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
+  if (!standalone) return;
+  var stored = null;
+  try { stored = localStorage.getItem("missingHeight"); } catch (e) {}
+  if (stored !== null) document.documentElement.style.setProperty("--missing-height", stored + "px");
+  else document.documentElement.classList.add("fit-pending");
+})();
+</script>
 <style>
 /* Layout: eine schmale Spalte wie die iPhone-App – Kopfzeile, Kurstabelle, Schrittleiste. Bewusst nur dunkel. */
 :root {
@@ -30,6 +43,24 @@
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
+/* Ladebildschirm, nur beim allerersten Start der Home-Bildschirm-App */
+#splash {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: var(--bg);
+  color: var(--muted);
+  font: 600 15px var(--font);
+  transition: opacity 0.25s ease;
+}
+#splash img { width: 96px; height: 96px; border-radius: 22px; }
+html.fit-pending #splash, html.fit-fading #splash { display: flex; }
+html.fit-fading #splash { opacity: 0; }
 html {
   height: 100%;
   background: var(--bg);
@@ -271,6 +302,7 @@ button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px sol
 </style>
 </head>
 <body>
+<div id="splash" aria-hidden="true"><img src="icons/icon-192.png" alt="">Umrechner</div>
 
 <div class="app" id="app">
   <header>
@@ -552,7 +584,7 @@ function closeInfo() { $("infoPanel").hidden = true; }
 $("infoBtn").onclick = openInfo;
 $("closeInfo").onclick = closeInfo;
 $("infoPanel").addEventListener("click", (e) => { if (e.target.id === "infoPanel") closeInfo(); });
-caches?.keys?.().then((keys) => { $("appVersion").textContent = `Version: ${keys.find((k) => k.startsWith("umrechner-")) || "–"}`; }).catch(() => {});
+caches?.keys?.().then((keys) => { $("appVersion").textContent = `Version ${(keys.find((k) => k.startsWith("umrechner-")) || "–").replace("umrechner-", "")}`; }).catch(() => {});
 function renderOptions() {
   const q = $("search").value.trim().toLowerCase();
   const list = currencies();
@@ -751,16 +783,40 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 // iOS meldet Home-Bildschirm-Apps mit durchsichtiger Statusleiste eine Fensterhöhe ohne die Statusleiste,
 // zeichnet sie aber ab der obersten Bildschirmkante – unten bliebe ein leerer Streifen. Die fehlende Höhe
 // wird gemessen und ausgeglichen; im Browser oder wenn nichts fehlt, bleibt der Ausgleich 0.
+// Der Wert ist je Gerät praktisch immer gleich; er wird gemerkt und beim nächsten Start schon vor dem
+// ersten Zeichnen gesetzt (Skript im <head>).
 function fitToScreen() {
   const standalone = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
   const portrait = matchMedia("(orientation: portrait)").matches;
   const screenHeight = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
   const missing = Math.round(screenHeight - window.innerHeight);
-  const valid = standalone && missing > 0 && missing <= 100;
-  document.documentElement.style.setProperty("--missing-height", valid ? `${missing}px` : "0px");
-  lastFit = { inner: Math.round(window.innerHeight), screen: screenHeight, applied: valid ? missing : 0, standalone };
+  let applied = standalone && missing > 0 && missing <= 100 ? missing : 0;
+  // Kurz nach dem Öffnen meldet iOS manchmal vorläufig „nichts fehlt“ – den gemerkten Wert dann nicht
+  // überschreiben, sonst springt die App. Erst wenn das auch nach der Einschwingzeit gilt, zählt es.
+  const settling = performance.now() < settleUntil;
+  if (applied === 0 && standalone && rememberedMissing > 0 && settling) applied = rememberedMissing;
+  document.documentElement.style.setProperty("--missing-height", `${applied}px`);
+  lastFit = { inner: Math.round(window.innerHeight), screen: screenHeight, applied, standalone };
+  if (standalone && applied !== rememberedMissing && (applied > 0 || !settling)) {
+    rememberedMissing = applied;
+    try { localStorage.setItem("missingHeight", String(applied)); } catch {}
+  }
 }
 let lastFit = null;
+let settleUntil = performance.now() + 1200;
+let rememberedMissing = (() => {
+  try { const v = localStorage.getItem("missingHeight"); return v === null ? null : Number(v); } catch { return null; }
+})();
+
+/** Ladebildschirm des allerersten Starts ausblenden, sobald die Höhe gemessen ist. */
+function finishSplash() {
+  const root = document.documentElement;
+  if (!root.classList.contains("fit-pending")) return;
+  fitToScreen();
+  root.classList.add("fit-fading");
+  root.classList.remove("fit-pending");
+  setTimeout(() => root.classList.remove("fit-fading"), 300);
+}
 
 // iOS meldet die Fensterhöhe direkt beim Öffnen manchmal vorläufig und korrigiert sie kurz danach, ohne
 // zuverlässig ein resize-Ereignis zu schicken. Deshalb mehrfach nachmessen – beim Start, kurz danach
@@ -771,7 +827,11 @@ function fitToScreenRepeatedly() {
 }
 window.addEventListener("resize", fitToScreen);
 window.addEventListener("pageshow", fitToScreenRepeatedly);
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") fitToScreenRepeatedly(); });
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  settleUntil = performance.now() + 1200;
+  fitToScreenRepeatedly();
+});
 
 // Die Bildschirmtastatur legt sich auf dem iPhone über die Seite, ohne sie zu verkleinern. Ein kurzes
 // Auswahlfenster (z. B. nur ein Suchtreffer) läge dann komplett dahinter. Solange die Tastatur offen ist,
@@ -791,6 +851,7 @@ window.visualViewport?.addEventListener("resize", fitSheetsToKeyboard);
 window.visualViewport?.addEventListener("scroll", fitSheetsToKeyboard);
 window.addEventListener("orientationchange", () => setTimeout(fitToScreenRepeatedly, 300));
 fitToScreenRepeatedly();
+setTimeout(finishSplash, 700);
 
 render();
 refreshIfStale();
