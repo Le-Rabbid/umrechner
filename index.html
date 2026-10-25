@@ -293,6 +293,15 @@ button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px sol
 .option .name { color: var(--muted); font-size: 12px; display: block; }
 .option .check { margin-left: auto; color: var(--accent); }
 .options-label { padding: 10px 4px 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+/* Das Gebühren-Fenster sitzt als Karte oben: unten würde es iOS bei Home-Bildschirm-Apps abschneiden
+   bzw. die Tastatur verdecken. */
+#feePanel { align-items: flex-start; padding-top: calc(env(safe-area-inset-top, 0px) + 64px); }
+#feePanel .sheet {
+  width: calc(100% - 2 * max(16px, env(safe-area-inset-left, 0px)));
+  max-height: none;
+  border-radius: 20px;
+  padding-bottom: 0;
+}
 #feeInput {
   width: 100%;
   background: var(--surface);
