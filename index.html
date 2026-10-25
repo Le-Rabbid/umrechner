@@ -30,20 +30,30 @@
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html, body { height: 100%; margin: 0; }
+html {
+  height: 100%;
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
-  display: flex;
-  justify-content: center;
 }
+/* Fest an alle Bildschirmränder geheftet statt height: 100% – auf dem Home-Bildschirm rechnet iOS
+   die Prozenthöhe ohne Statusleiste und Home-Balken, dann bliebe unten ein Streifen frei. */
 .app {
+  position: fixed;
+  inset: 0;
+  margin-inline: auto;
   width: 100%;
   max-width: 440px;
-  height: 100%;
   display: flex;
   flex-direction: column;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
@@ -112,7 +122,11 @@ button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px sol
   font-weight: 600;
   text-align: center;
 }
-.table { flex: 1; overflow-y: auto; margin-inline: -16px; overscroll-behavior: contain; }
+/* Die zehn Hauptzeilen wachsen mit, damit die Tabelle auch große Bildschirme füllt;
+   sind Zwischenwerte aufgeklappt und reicht der Platz nicht, scrollt die Tabelle. */
+.table { flex: 1; display: flex; flex-direction: column; overflow-y: auto; margin-inline: -16px; overscroll-behavior: contain; }
+.table .row:not(.sub) { flex: 1 0 auto; }
+.table .row.sub, .table .footer { flex: none; }
 .row {
   display: flex;
   justify-content: space-between;
