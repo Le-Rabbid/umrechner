@@ -291,10 +291,11 @@ button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px sol
 }
 .option .flag { font-size: 22px; }
 .option .name { color: var(--muted); font-size: 12px; display: block; }
-.option .check { margin-left: auto; color: var(--accent); }
+.option .check { margin-left: auto; flex: none; width: 14px; text-align: right; color: var(--accent); }
 .option { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
-.option .pin { margin-left: auto; color: var(--muted); font-size: 13px; }
-.option .pin + .check { margin-left: 8px; }
+/* Angeheftet: kleiner Punkt in der Akzentfarbe */
+.option .pin { margin-left: auto; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.option .pin + .check { margin-left: 10px; }
 .picker-hint { margin: -2px 0 6px; font-size: 11px; color: var(--muted); }
 .options-label { padding: 10px 4px 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
 /* Das Gebühren-Fenster sitzt als Karte oben: unten würde es iOS bei Home-Bildschirm-Apps abschneiden
@@ -759,8 +760,8 @@ function renderOptions() {
   const list = currencies();
   const selected = state[state.picking];
   const option = (c) => `<button class="option" data-code="${c}"><span class="flag">${flag(c)}</span><span>${c}<span class="name">${currencyName(c)}</span></span>`
-    + (state.pinned.includes(c) ? '<span class="pin" aria-label="angeheftet">📌</span>' : "")
-    + (c === selected ? '<span class="check">✓</span>' : "") + `</button>`;
+    + (state.pinned.includes(c) ? '<span class="pin" role="img" aria-label="angeheftet"></span>' : "")
+    + `<span class="check">${c === selected ? "✓" : ""}</span></button>`; // Platz fürs Häkchen immer frei halten
   const matches = (c) => !q || c.toLowerCase().includes(q) || currencyName(c).toLowerCase().includes(q);
   // Ohne Suche: angeheftete Währungen ganz oben, dann die zuvor gewählte – ein Tipp, und man ist zurück.
   const pinned = q ? [] : state.pinned.filter((c) => list.includes(c));

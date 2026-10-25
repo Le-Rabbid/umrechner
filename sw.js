@@ -3,7 +3,7 @@
 // Die Kurse selbst verwaltet die App (localStorage); Anfragen an die Kurs-API laufen hier nicht durch.
 // Bei jeder Änderung an den App-Dateien APP_VERSION erhöhen (Semantic Versioning: Fehlerkorrektur 1.0.1,
 // neue Funktion 1.1.0, großer Umbau 2.0.0) – dann laden installierte Apps das Update.
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.2.1";
 const VERSION = `umrechner-${APP_VERSION}`;
 const FILES = [
   "./",
