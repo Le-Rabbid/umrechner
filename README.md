@@ -30,6 +30,12 @@ Einstellungen und gespeicherte Kurse bleiben auf dem Gerät (localStorage), es g
 - Landesgrenzen: [Natural Earth](https://www.naturalearthdata.com) (gemeinfrei), Admin 0 – Countries, 1:50 Mio., vereinfacht.
 - Land aus Koordinaten (online): [BigDataCloud](https://www.bigdatacloud.com/free-api/free-reverse-geocode-to-city-api), kostenlose Client-Schnittstelle.
 
+## Lizenz
+
+Gemeinfrei nach [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/deed.de), siehe [LICENSE](LICENSE). Jeder darf den Code ohne Bedingungen nutzen, verändern und weitergeben, auch ohne Namensnennung – ohne jede Gewähr und Haftung.
+
+Die Lizenz gilt für den Code, das Icon und die Texte dieses Repositorys. Die abgerufenen Wechselkurse und die Landesgrenzen (Natural Earth, selbst gemeinfrei) unterliegen den Bedingungen ihrer Quellen; „Claude“ und „Anthropic“ sind Namen von Anthropic.
+
 ## Entwicklung
 
 - `index.html` – die App, `sw.js` – Offline-Speicher, `manifest.webmanifest` – App-Name und Icons
