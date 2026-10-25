@@ -16,16 +16,16 @@
 <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <script>
-// Läuft vor dem ersten Zeichnen: In der Home-Bildschirm-App den gemerkten Höhenausgleich sofort setzen
-// (siehe fitToScreen), damit nichts springt. Gibt es noch keinen (allererster Start), kurz den
-// Ladebildschirm zeigen, bis die Höhe gemessen ist.
+// Läuft vor dem ersten Zeichnen: Die Home-Bildschirm-App startet immer mit dem Ladebildschirm; dahinter
+// wird der gemerkte Höhenausgleich gesetzt (siehe fitToScreen) und nachgemessen, damit nichts springt.
+// Im normalen Browser gibt es keinen Ladebildschirm.
 (function () {
   var standalone = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
   if (!standalone) return;
+  document.documentElement.classList.add("fit-pending");
   var stored = null;
   try { stored = localStorage.getItem("missingHeight"); } catch (e) {}
   if (stored !== null) document.documentElement.style.setProperty("--missing-height", stored + "px");
-  else document.documentElement.classList.add("fit-pending");
 })();
 </script>
 <style>
@@ -43,7 +43,7 @@
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-/* Ladebildschirm, nur beim allerersten Start der Home-Bildschirm-App */
+/* Ladebildschirm bei jedem Start der Home-Bildschirm-App (nicht beim Zurückholen aus dem Hintergrund) */
 #splash {
   position: fixed;
   inset: 0;
@@ -808,7 +808,7 @@ let rememberedMissing = (() => {
   try { const v = localStorage.getItem("missingHeight"); return v === null ? null : Number(v); } catch { return null; }
 })();
 
-/** Ladebildschirm des allerersten Starts ausblenden, sobald die Höhe gemessen ist. */
+/** Ladebildschirm ausblenden, sobald die Höhe gemessen ist. */
 function finishSplash() {
   const root = document.documentElement;
   if (!root.classList.contains("fit-pending")) return;
