@@ -340,6 +340,7 @@ button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px sol
       <p>Alle Angaben ohne Gewähr. Die Kurse sind Referenzkurse der EZB, werden in der Regel einmal pro Werktag veröffentlicht und können veraltet oder fehlerhaft sein. Banken, Wechselstuben und Kartenanbieter rechnen mit eigenen Kursen und Gebühren. Die App dient nur der Orientierung und ist keine Finanzberatung. Für Schäden, die aus der Nutzung entstehen, wird keine Haftung übernommen, soweit gesetzlich zulässig.</p>
 
       <p class="small" id="appVersion"></p>
+      <p class="small" id="appDiag"></p>
     </div>
   </div>
 </div>
@@ -540,6 +541,10 @@ function openPicker(target) {
 function closePicker() { $("picker").hidden = true; state.picking = null; }
 
 function openInfo() {
+  // Messwerte zur Bildschirmhöhe – hilft, falls unten doch einmal ein Streifen frei bleibt.
+  $("appDiag").textContent = lastFit
+    ? `Anzeige ${lastFit.inner} / ${lastFit.screen} · Ausgleich ${lastFit.applied}${lastFit.standalone ? "" : " · im Browser"}`
+    : "";
   $("infoPanel").hidden = false;
   $("closeInfo").focus();
 }
@@ -753,8 +758,20 @@ function fitToScreen() {
   const missing = Math.round(screenHeight - window.innerHeight);
   const valid = standalone && missing > 0 && missing <= 100;
   document.documentElement.style.setProperty("--missing-height", valid ? `${missing}px` : "0px");
+  lastFit = { inner: Math.round(window.innerHeight), screen: screenHeight, applied: valid ? missing : 0, standalone };
+}
+let lastFit = null;
+
+// iOS meldet die Fensterhöhe direkt beim Öffnen manchmal vorläufig und korrigiert sie kurz danach, ohne
+// zuverlässig ein resize-Ereignis zu schicken. Deshalb mehrfach nachmessen – beim Start, kurz danach
+// und beim Zurückholen aus dem Hintergrund.
+function fitToScreenRepeatedly() {
+  fitToScreen();
+  for (const delay of [100, 500, 1500]) setTimeout(fitToScreen, delay);
 }
 window.addEventListener("resize", fitToScreen);
+window.addEventListener("pageshow", fitToScreenRepeatedly);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") fitToScreenRepeatedly(); });
 
 // Die Bildschirmtastatur legt sich auf dem iPhone über die Seite, ohne sie zu verkleinern. Ein kurzes
 // Auswahlfenster (z. B. nur ein Suchtreffer) läge dann komplett dahinter. Solange die Tastatur offen ist,
@@ -772,8 +789,8 @@ function fitSheetsToKeyboard() {
 }
 window.visualViewport?.addEventListener("resize", fitSheetsToKeyboard);
 window.visualViewport?.addEventListener("scroll", fitSheetsToKeyboard);
-window.addEventListener("orientationchange", () => setTimeout(fitToScreen, 300));
-fitToScreen();
+window.addEventListener("orientationchange", () => setTimeout(fitToScreenRepeatedly, 300));
+fitToScreenRepeatedly();
 
 render();
 refreshIfStale();
