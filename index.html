@@ -620,7 +620,8 @@ function setCurrency(target, code) {
   const replaced = state[target];
   if (state[other] === code) {
     state[other] = replaced; // das ist ein Tausch, keine neue Währung – nichts merken
-  } else if (replaced !== code) {
+  } else if (replaced !== code && !state.pinned.includes(replaced)) {
+    // Angeheftete Währungen stehen ohnehin oben – sie würden die zuletzt genutzte nur verdrängen.
     state.lastUsed = replaced;
     store("lastUsed", replaced);
   }
