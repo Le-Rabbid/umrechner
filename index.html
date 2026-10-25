@@ -292,6 +292,10 @@ button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px sol
 .option .flag { font-size: 22px; }
 .option .name { color: var(--muted); font-size: 12px; display: block; }
 .option .check { margin-left: auto; color: var(--accent); }
+.option { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.option .pin { margin-left: auto; color: var(--muted); font-size: 13px; }
+.option .pin + .check { margin-left: 8px; }
+.picker-hint { margin: -2px 0 6px; font-size: 11px; color: var(--muted); }
 .options-label { padding: 10px 4px 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
 /* Das Gebühren-Fenster sitzt als Karte oben: unten würde es iOS bei Home-Bildschirm-Apps abschneiden
    bzw. die Tastatur verdecken. */
@@ -462,6 +466,7 @@ button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px sol
       <button class="icon-btn" id="closePicker" aria-label="Schließen">✕</button>
     </div>
     <input id="search" type="search" placeholder="Franken, USD, Yen …" autocomplete="off">
+    <p class="picker-hint">Lange drücken, um eine Währung oben anzuheften oder zu lösen.</p>
     <div class="options" id="options"></div>
   </div>
 </div>
@@ -491,6 +496,7 @@ const state = {
   failed: false,   // letzter Ladeversuch gescheitert → Offline-Hinweis
   picking: null,
   lastUsed: load("lastUsed", null),   // die zuvor gewählte Währung, steht in der Auswahl oben
+  pinned: load("pinned", []),         // per langem Drücken angeheftete Währungen, ganz oben in der Auswahl
   feePercent: load("feePercent", null), // Aufschlag in %, null = noch nie eingegeben
   feeOn: load("feeOn", false),
 };
@@ -752,15 +758,20 @@ function renderOptions() {
   const q = $("search").value.trim().toLowerCase();
   const list = currencies();
   const selected = state[state.picking];
-  const option = (c) => `<button class="option" data-code="${c}"><span class="flag">${flag(c)}</span><span>${c}<span class="name">${currencyName(c)}</span></span>${c === selected ? '<span class="check">✓</span>' : ""}</button>`;
-  // Ohne Suche steht die zuvor gewählte Währung oben – ein Tipp, und man ist zurück.
-  const recent = !q && state.lastUsed && list.includes(state.lastUsed) && state.lastUsed !== selected ? state.lastUsed : null;
-  const ordered = [...POPULAR.filter((c) => list.includes(c)), ...list.filter((c) => !POPULAR.includes(c))]
-    .filter((c) => c !== recent)
-    .filter((c) => !q || c.toLowerCase().includes(q) || currencyName(c).toLowerCase().includes(q));
-  $("options").innerHTML = recent
-    ? `<div class="options-label">Zuletzt genutzt</div>${option(recent)}<div class="options-label">Alle Währungen</div>${ordered.map(option).join("")}`
-    : ordered.map(option).join("");
+  const option = (c) => `<button class="option" data-code="${c}"><span class="flag">${flag(c)}</span><span>${c}<span class="name">${currencyName(c)}</span></span>`
+    + (state.pinned.includes(c) ? '<span class="pin" aria-label="angeheftet">📌</span>' : "")
+    + (c === selected ? '<span class="check">✓</span>' : "") + `</button>`;
+  const matches = (c) => !q || c.toLowerCase().includes(q) || currencyName(c).toLowerCase().includes(q);
+  // Ohne Suche: angeheftete Währungen ganz oben, dann die zuvor gewählte – ein Tipp, und man ist zurück.
+  const pinned = q ? [] : state.pinned.filter((c) => list.includes(c));
+  const recent = !q && state.lastUsed && list.includes(state.lastUsed) && state.lastUsed !== selected && !pinned.includes(state.lastUsed) ? state.lastUsed : null;
+  const rest = [...POPULAR.filter((c) => list.includes(c)), ...list.filter((c) => !POPULAR.includes(c))]
+    .filter((c) => !pinned.includes(c) && c !== recent && matches(c));
+  const groups = [["Angeheftet", pinned], ["Zuletzt genutzt", recent ? [recent] : []]].filter(([, codes]) => codes.length);
+  $("options").innerHTML = groups.length
+    ? groups.map(([label, codes]) => `<div class="options-label">${label}</div>${codes.map(option).join("")}`).join("")
+      + `<div class="options-label">Alle Währungen</div>${rest.map(option).join("")}`
+    : rest.map(option).join("");
 }
 $("fromBtn").onclick = () => openPicker("from");
 $("toBtn").onclick = () => openPicker("to");
@@ -770,9 +781,34 @@ $("search").addEventListener("input", renderOptions);
 $("options").addEventListener("click", (e) => {
   const btn = e.target.closest(".option");
   if (!btn) return;
+  if (pinLongPress) { pinLongPress = false; return; } // langes Drücken hat angeheftet, nicht auswählen
   setCurrency(state.picking, btn.dataset.code);
   closePicker();
 });
+
+// Langes Drücken auf eine Währung heftet sie oben an bzw. löst sie wieder.
+let pinTimer = null, pinLongPress = false, pinStart = null;
+function togglePin(code) {
+  state.pinned = state.pinned.includes(code) ? state.pinned.filter((c) => c !== code) : [...state.pinned, code];
+  store("pinned", state.pinned);
+  renderOptions();
+}
+$("options").addEventListener("pointerdown", (e) => {
+  const btn = e.target.closest(".option");
+  if (!btn) return;
+  pinLongPress = false;
+  pinStart = { x: e.clientX, y: e.clientY };
+  clearTimeout(pinTimer);
+  pinTimer = setTimeout(() => { pinLongPress = true; togglePin(btn.dataset.code); }, 550);
+});
+$("options").addEventListener("pointermove", (e) => {
+  // Beim Scrollen der Liste nicht anheften.
+  if (pinStart && Math.hypot(e.clientX - pinStart.x, e.clientY - pinStart.y) > 10) clearTimeout(pinTimer);
+});
+for (const type of ["pointerup", "pointercancel", "pointerleave"]) {
+  $("options").addEventListener(type, () => { clearTimeout(pinTimer); pinStart = null; });
+}
+$("options").addEventListener("contextmenu", (e) => e.preventDefault());
 
 // ---- Land erkennen ----
 // 1. Standort (ungefähr genügt) → Online-Dienst fragen: schnell und exakt. Die Koordinaten werden
