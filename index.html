@@ -593,7 +593,8 @@ function setScale(factor) {
   const next = Math.round(state.scale * factor);
   if (next < MIN_SCALE || next > MAX_SCALE || next === state.scale) return;
   state.scale = next;
-  state.expanded = null;
+  // Eine aufgeklappte Zeile rechnet mit: 100 (110, 120 …) wird bei ×10 zu 1000 (1100, 1200 …).
+  if (state.expanded !== null) state.expanded = Math.round(state.expanded * factor);
   store("scale", next);
   render();
 }
