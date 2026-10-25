@@ -715,8 +715,24 @@ render();
 refreshIfStale();
 
 // Offline-Fähigkeit: App-Dateien im Service Worker speichern
+// Updates: iOS lässt Home-Bildschirm-Apps im Hintergrund weiterlaufen, „wieder öffnen“ lädt sie nicht neu.
+// Deshalb bei jedem Zurückholen nach einer neuen Version fragen; ist eine da, startet die App neu.
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    // Beim allerersten Besuch übernimmt der Service Worker nur – dann nicht neu laden.
+    if (!hadController || reloading) return;
+    reloading = true;
+    location.reload();
+  });
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then((registration) => {
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") registration.update().catch(() => {});
+      });
+    }).catch(() => {});
+  });
 }
 </script>
 </body>

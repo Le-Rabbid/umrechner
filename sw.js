@@ -2,7 +2,7 @@
 // Service Worker: speichert die App-Dateien, damit der Umrechner auch ohne Internet startet.
 // Die Kurse selbst verwaltet die App (localStorage); Anfragen an die Kurs-API laufen hier nicht durch.
 // Bei jeder Änderung an den App-Dateien VERSION erhöhen, damit installierte Apps das Update laden.
-const VERSION = "umrechner-v5";
+const VERSION = "umrechner-v6";
 const FILES = [
   "./",
   "./index.html",
@@ -15,8 +15,16 @@ const FILES = [
   "./icons/icon-512.png",
 ];
 
+// GitHub Pages erlaubt dem Browser, Dateien 10 Minuten zwischenzuspeichern. Damit ein Update nicht
+// wieder die alten Dateien einsammelt, wird hier am HTTP-Zwischenspeicher vorbei geladen.
+const fresh = (url) => new Request(url, { cache: "reload" });
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(VERSION).then((cache) => cache.addAll(FILES)).then(() => self.skipWaiting()));
+  event.waitUntil(
+    caches.open(VERSION)
+      .then((cache) => cache.addAll(FILES.map(fresh)))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener("activate", (event) => {
@@ -31,13 +39,15 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET" || new URL(request.url).origin !== self.location.origin) return;
 
-  // Seitenaufrufe: zuerst online versuchen (für Updates), sonst gespeicherte Fassung.
+  // Seitenaufrufe: zuerst frisch vom Server (für Updates), offline die gespeicherte Fassung.
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request)
+      fetch(fresh(request.url))
         .then((response) => {
-          const copy = response.clone();
-          caches.open(VERSION).then((cache) => cache.put("./index.html", copy));
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(VERSION).then((cache) => cache.put("./index.html", copy));
+          }
           return response;
         })
         .catch(() => caches.match("./index.html")),
@@ -45,6 +55,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Übrige App-Dateien: aus dem Speicher, sonst aus dem Netz.
+  // Übrige App-Dateien: aus dem Speicher dieser Version, sonst aus dem Netz.
   event.respondWith(caches.match(request).then((cached) => cached || fetch(request)));
 });

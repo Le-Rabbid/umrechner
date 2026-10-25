@@ -41,4 +41,4 @@ Die Lizenz gilt für den Code, das Icon und die Texte dieses Repositorys. Die ab
 - `index.html` – die App, `sw.js` – Offline-Speicher, `manifest.webmanifest` – App-Name und Icons
 - `data.js` neu erzeugen (Zeitzonen, Währungen, Rückfall-Kurse): `python3 tools/make-data.py`
 - `borders.json` neu erzeugen: Natural-Earth-Datei laden und `python3 tools/make-borders.py <datei.geojson>`
-- Nach Änderungen an App-Dateien in `sw.js` die `VERSION` erhöhen, damit installierte Apps das Update laden
+- Nach Änderungen an App-Dateien in `sw.js` die `VERSION` erhöhen. Installierte Apps suchen beim Öffnen und beim Zurückholen aus dem Hintergrund nach Updates und starten sich bei einer neuen Version selbst neu.
