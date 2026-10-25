@@ -42,6 +42,7 @@
   --muted: rgba(234, 232, 226, 0.5);
   --accent: #8FBEA8;
   --warning: #E6B875;
+  --fee: #B9A8E3;      /* Lavendel: Werte inklusive Gebühr */
   --font: ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
   color-scheme: dark;
 }
@@ -157,6 +158,27 @@ button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px sol
   font-variant-numeric: tabular-nums;
 }
 .refresh { color: var(--accent); font-size: 17px; width: 34px; height: 34px; }
+#standText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Gebühren-Knopf: tippen = an/aus, lange drücken (oder erstes Tippen) = Aufschlag eingeben */
+.fee-btn {
+  flex: none;
+  height: 26px;
+  min-width: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font: 600 12px var(--font);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.fee-btn.active { border-color: transparent; background: color-mix(in srgb, var(--fee) 22%, transparent); color: var(--fee); }
+.row .to.fee { color: var(--fee); }
+.row.sub .to.fee { color: color-mix(in srgb, var(--fee) 75%, transparent); }
 .refresh:disabled { cursor: default; opacity: 0.6; }
 .notice { padding: 0 8px 8px; font-size: 12px; color: var(--muted); text-align: center; }
 .notice.error { color: var(--warning); }
@@ -270,6 +292,23 @@ button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px sol
 .option .flag { font-size: 22px; }
 .option .name { color: var(--muted); font-size: 12px; display: block; }
 .option .check { margin-left: auto; color: var(--accent); }
+.options-label { padding: 10px 4px 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+#feeInput {
+  width: 100%;
+  background: var(--surface);
+  border: 0;
+  border-radius: 10px;
+  color: var(--text);
+  font: 600 22px var(--font);
+  font-variant-numeric: tabular-nums;
+  padding: 10px 12px;
+}
+.fee-help { margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.fee-error { margin-top: 6px; font-size: 13px; color: var(--warning); }
+.fee-actions { display: flex; gap: 10px; margin: 14px 0 16px; }
+.fee-actions button { flex: 1; border-radius: 12px; padding: 12px; font: 600 15px var(--font); cursor: pointer; }
+#feeSave { background: var(--accent); color: var(--bg); border: 0; }
+#feeRemove { background: none; color: var(--muted); border: 1px solid var(--line); }
 
 /* Hinweis „Als App installieren“ – nur im Browser, nicht in der installierten App */
 .install {
@@ -331,6 +370,7 @@ button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px sol
   <div class="stand">
     <button class="icon-btn" id="infoBtn" aria-label="Info, Quellen und Haftung" title="Info, Quellen und Haftung">ⓘ</button>
     <span id="standText"></span>
+    <button class="fee-btn" id="feeBtn" aria-label="Gebühr" title="Gebühr: tippen = an/aus, lange drücken = ändern">%</button>
     <button class="icon-btn refresh" id="refreshBtn" aria-label="Kurse aktualisieren" title="Kurse aktualisieren">↻</button>
   </div>
   <div class="notice" id="notice" role="status" hidden></div>
@@ -390,6 +430,22 @@ button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px sol
   </div>
 </div>
 
+<div class="picker" id="feePanel" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="feeTitle">
+    <div class="sheet-head">
+      <h2 id="feeTitle">Gebühr</h2>
+      <button class="icon-btn" id="closeFee" aria-label="Schließen">✕</button>
+    </div>
+    <p class="fee-help">Viele Karten und Banken schlagen im Ausland etwas auf, oft 1–2 %. Ist die Gebühr aktiv, zeigt die rechte Spalte den Betrag einschließlich Aufschlag – in Lavendel. Später: tippen schaltet an und aus, lange drücken ändert den Wert.</p>
+    <input id="feeInput" type="text" inputmode="decimal" autocomplete="off" placeholder="1,75" aria-label="Aufschlag in Prozent">
+    <div class="fee-error" id="feeError" hidden></div>
+    <div class="fee-actions">
+      <button id="feeRemove">Entfernen</button>
+      <button id="feeSave">Übernehmen</button>
+    </div>
+  </div>
+</div>
+
 <div class="picker" id="picker" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
     <div class="sheet-head">
@@ -425,7 +481,14 @@ const state = {
   rates: load("rates", null) || FALLBACK,
   failed: false,   // letzter Ladeversuch gescheitert → Offline-Hinweis
   picking: null,
+  lastUsed: load("lastUsed", null),   // die zuvor gewählte Währung, steht in der Auswahl oben
+  feePercent: load("feePercent", null), // Aufschlag in %, null = noch nie eingegeben
+  feeOn: load("feeOn", false),
 };
+/** Faktor für die rechte Spalte: mit aktiver Gebühr der Betrag einschließlich Aufschlag. */
+const feeFactor = () => (state.feeOn && state.feePercent ? 1 + state.feePercent / 100 : 1);
+/** 1.75 → „1,75“, 2 → „2“ */
+const feeLabel = (percent) => percent.toLocaleString("de-DE", { maximumFractionDigits: 2 });
 
 const flag = (code) => code.slice(0, 2).toUpperCase().replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)));
 const currencyName = (code) => (currencyNames && currencyNames.of(code)) || code;
@@ -455,11 +518,16 @@ function render() {
   $("toBtn").innerHTML = `<span class="flag">${flag(state.to)}</span>${state.to}<span class="chev">▾</span>`;
 
   // Kurz und in Zahlen, damit die Zeile auch auf kleinen iPhones neben die Knöpfe passt.
-  const ecbDate = new Date(state.rates.date + "T12:00:00").toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
-  const fetched = state.rates.fetchedAt
-    ? new Date(state.rates.fetchedAt).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+  const ecbDate = new Date(state.rates.date + "T12:00:00").toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+  // Abruf von heute: nur die Uhrzeit, sonst Datum und Uhrzeit.
+  const fetchedAt = state.rates.fetchedAt ? new Date(state.rates.fetchedAt) : null;
+  const fetchedToday = fetchedAt && fetchedAt.toDateString() === new Date().toDateString();
+  const fetched = fetchedAt
+    ? fetchedAt.toLocaleString("de-DE", fetchedToday
+      ? { hour: "2-digit", minute: "2-digit" }
+      : { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
     : null;
-  $("standText").textContent = `Kurse vom ${ecbDate}` + (fetched ? ` · abgerufen ${fetched}` : "");
+  $("standText").textContent = `Kurse ${ecbDate}` + (fetched ? ` · abgerufen ${fetched}` : "");
 
   // Warnung, solange nicht mit aktuellen Kursen gerechnet wird.
   const banner = $("banner");
@@ -475,6 +543,11 @@ function render() {
     banner.hidden = true;
   }
 
+  const feeActive = feeFactor() !== 1;
+  $("feeBtn").textContent = feeActive ? `+${feeLabel(state.feePercent)} %` : "%";
+  $("feeBtn").classList.toggle("active", feeActive);
+  $("feeBtn").setAttribute("aria-pressed", String(feeActive));
+
   const r = rate(state.from, state.to);
   let html = "";
   for (let i = 1; i <= 10; i++) {
@@ -485,7 +558,11 @@ function render() {
     }
   }
   // Quellen, KI-Hinweis und Haftung stehen im Info-Fenster (ⓘ); hier nur der aktuelle Kurs.
-  if (r) html += `<div class="footer">1 ${state.from} = ${nf(4).format(r)} ${state.to}</div>`;
+  if (r) {
+    html += `<div class="footer">1 ${state.from} = ${nf(4).format(r)} ${state.to}`
+      + (feeActive ? `<br><span style="color: var(--fee)">mit ${feeLabel(state.feePercent)} % Gebühr: ${nf(4).format(r * feeFactor())} ${state.to}</span>` : "")
+      + `</div>`;
+  }
   $("table").innerHTML = html;
 
   $("scaleLabel").textContent = `Schritte à ${plain.format(state.scale)}`;
@@ -494,9 +571,10 @@ function render() {
 }
 
 function row(value, r, sub) {
-  const result = r ? formatResult(value * r, state.to) : "–";
+  const factor = feeFactor();
+  const result = r ? formatResult(value * r * factor, state.to) : "–";
   const attrs = sub ? `class="row sub" role="listitem"` : `class="row" role="listitem" tabindex="0" data-v="${value}"`;
-  return `<div ${attrs}><span>${plain.format(value)}</span><span class="to">${result}</span></div>`;
+  return `<div ${attrs}><span>${plain.format(value)}</span><span class="to${factor !== 1 ? " fee" : ""}">${result}</span></div>`;
 }
 
 let noticeTimer;
@@ -522,7 +600,13 @@ function setScale(factor) {
 
 function setCurrency(target, code) {
   const other = target === "from" ? "to" : "from";
-  if (state[other] === code) state[other] = state[target];
+  const replaced = state[target];
+  if (state[other] === code) {
+    state[other] = replaced; // das ist ein Tausch, keine neue Währung – nichts merken
+  } else if (replaced !== code) {
+    state.lastUsed = replaced;
+    store("lastUsed", replaced);
+  }
   state[target] = code;
   store("from", state.from);
   store("to", state.to);
@@ -564,6 +648,7 @@ $("app").addEventListener("touchend", (e) => {
 });
 $("app").addEventListener("touchcancel", () => { gesture = null; });
 document.addEventListener("keydown", (e) => {
+  if (!$("feePanel").hidden) { if (e.key === "Escape") closeFee(); if (e.key === "Enter") saveFee(); return; }
   if (!$("infoPanel").hidden) { if (e.key === "Escape") closeInfo(); return; }
   if (!$("picker").hidden) { if (e.key === "Escape") closePicker(); return; }
   if (e.key === "ArrowRight") setScale(10);
@@ -573,6 +658,61 @@ document.addEventListener("keydown", (e) => {
 $("upBtn").onclick = () => setScale(10);
 $("downBtn").onclick = () => setScale(0.1);
 $("swapBtn").onclick = () => setCurrency("from", state.to);
+
+// ---- Gebühr ----
+// Erstes Tippen (noch kein Wert) oder langes Drücken: Aufschlag eingeben. Sonst: an/aus.
+let feePressTimer = null, feeLongPress = false;
+$("feeBtn").addEventListener("pointerdown", () => {
+  feeLongPress = false;
+  clearTimeout(feePressTimer);
+  feePressTimer = setTimeout(() => { feeLongPress = true; openFee(); }, 550);
+});
+for (const type of ["pointerup", "pointerleave", "pointercancel"]) {
+  $("feeBtn").addEventListener(type, () => clearTimeout(feePressTimer));
+}
+$("feeBtn").addEventListener("contextmenu", (e) => e.preventDefault());
+$("feeBtn").addEventListener("click", () => {
+  if (feeLongPress) { feeLongPress = false; return; }
+  if (!state.feePercent) { openFee(); return; }
+  state.feeOn = !state.feeOn;
+  store("feeOn", state.feeOn);
+  render();
+});
+
+function openFee() {
+  $("feeInput").value = state.feePercent ? feeLabel(state.feePercent) : "";
+  $("feeError").hidden = true;
+  $("feeRemove").hidden = !state.feePercent;
+  $("feePanel").hidden = false;
+  $("feeInput").focus();
+}
+function closeFee() { $("feePanel").hidden = true; }
+function saveFee() {
+  const value = Number($("feeInput").value.trim().replace("%", "").replace(",", "."));
+  if (!(value > 0 && value <= 20)) {
+    $("feeError").textContent = "Bitte einen Aufschlag zwischen 0 und 20 % eingeben, z. B. 1,75.";
+    $("feeError").hidden = false;
+    return;
+  }
+  state.feePercent = Math.round(value * 100) / 100;
+  state.feeOn = true;
+  store("feePercent", state.feePercent);
+  store("feeOn", true);
+  closeFee();
+  render();
+}
+$("feeSave").onclick = saveFee;
+$("feeRemove").onclick = () => {
+  state.feePercent = null;
+  state.feeOn = false;
+  store("feePercent", null);
+  store("feeOn", false);
+  closeFee();
+  render();
+};
+$("closeFee").onclick = closeFee;
+$("feePanel").addEventListener("click", (e) => { if (e.target.id === "feePanel") closeFee(); });
+$("feeInput").addEventListener("input", () => { $("feeError").hidden = true; });
 
 // Währungsauswahl
 function openPicker(target) {
@@ -601,12 +741,16 @@ caches?.keys?.().then((keys) => { $("appVersion").textContent = `Version ${(keys
 function renderOptions() {
   const q = $("search").value.trim().toLowerCase();
   const list = currencies();
-  const ordered = [...POPULAR.filter((c) => list.includes(c)), ...list.filter((c) => !POPULAR.includes(c))];
   const selected = state[state.picking];
-  $("options").innerHTML = ordered
-    .filter((c) => !q || c.toLowerCase().includes(q) || currencyName(c).toLowerCase().includes(q))
-    .map((c) => `<button class="option" data-code="${c}"><span class="flag">${flag(c)}</span><span>${c}<span class="name">${currencyName(c)}</span></span>${c === selected ? '<span class="check">✓</span>' : ""}</button>`)
-    .join("");
+  const option = (c) => `<button class="option" data-code="${c}"><span class="flag">${flag(c)}</span><span>${c}<span class="name">${currencyName(c)}</span></span>${c === selected ? '<span class="check">✓</span>' : ""}</button>`;
+  // Ohne Suche steht die zuvor gewählte Währung oben – ein Tipp, und man ist zurück.
+  const recent = !q && state.lastUsed && list.includes(state.lastUsed) && state.lastUsed !== selected ? state.lastUsed : null;
+  const ordered = [...POPULAR.filter((c) => list.includes(c)), ...list.filter((c) => !POPULAR.includes(c))]
+    .filter((c) => c !== recent)
+    .filter((c) => !q || c.toLowerCase().includes(q) || currencyName(c).toLowerCase().includes(q));
+  $("options").innerHTML = recent
+    ? `<div class="options-label">Zuletzt genutzt</div>${option(recent)}<div class="options-label">Alle Währungen</div>${ordered.map(option).join("")}`
+    : ordered.map(option).join("");
 }
 $("fromBtn").onclick = () => openPicker("from");
 $("toBtn").onclick = () => openPicker("to");

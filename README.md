@@ -4,6 +4,8 @@ Währungsrechner als Web-App (PWA) mit den Referenzkursen der Europäischen Zent
 
 - Kurstabelle mit runden Beträgen; wischen oder ← → für ×10 / ÷10, Zeile antippen für Zwischenwerte
 - ↻ lädt neue Kurse; ohne Verbindung gelten die zuletzt gespeicherten (mit Hinweis)
+- Gebühren-Knopf (%): Aufschlag eingeben (erstes Tippen oder lange drücken), danach per Tippen an/aus; mit Gebühr zeigt die rechte Spalte den Betrag einschließlich Aufschlag in Lavendel
+- In der Währungsauswahl steht die zuvor genutzte Währung oben
 - Standort-Knopf stellt die Landeswährung ein (siehe „Landeserkennung“)
 - Im Browser blendet die Seite einen Hinweis zum Installieren ein (iPhone: Schritt-für-Schritt-Anleitung, Android/Chrome: Installieren-Knopf); mit ✕ dauerhaft ausblendbar
 
