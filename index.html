@@ -222,6 +222,32 @@ button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px sol
 .option .name { color: var(--muted); font-size: 12px; display: block; }
 .option .check { margin-left: auto; color: var(--accent); }
 
+/* Hinweis „Als App installieren“ – nur im Browser, nicht in der installierten App */
+.install {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+  padding: 10px 6px 10px 12px;
+  background: var(--surface);
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
+}
+.install svg { width: 16px; height: 16px; vertical-align: -3px; color: var(--accent); }
+.install .grow { flex: 1; }
+.install .install-btn {
+  background: var(--accent);
+  color: var(--bg);
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font: 600 13px var(--font);
+  cursor: pointer;
+}
+.install .icon-btn { width: 32px; height: 32px; font-size: 14px; }
+
 /* Info-Fenster: Quellen, KI-Hinweis, Datenschutz, Haftung */
 #infoBtn { color: var(--muted); font-size: 16px; width: 34px; height: 34px; }
 .info-body { overflow-y: auto; padding-bottom: 20px; font-size: 14px; line-height: 1.55; color: var(--text); -webkit-user-select: text; user-select: text; }
@@ -260,6 +286,11 @@ button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px sol
   <div class="notice" id="notice" role="status" hidden></div>
   <div class="banner" id="banner" hidden></div>
   <div class="table" id="table" role="list"></div>
+  <div class="install" id="installHint" role="note" hidden>
+    <span class="grow" id="installText"></span>
+    <button class="install-btn" id="installBtn" hidden>Installieren</button>
+    <button class="icon-btn" id="installClose" aria-label="Hinweis ausblenden">✕</button>
+  </div>
   <div class="scalebar">
     <button class="icon-btn" id="downBtn" aria-label="Beträge durch zehn" title="÷10 (←)">‹</button>
     <div style="text-align:center">
@@ -726,6 +757,45 @@ render();
 refreshIfStale();
 
 // Offline-Fähigkeit: App-Dateien im Service Worker speichern
+// ---- Hinweis „Als App installieren“ ----
+// Auf dem iPhone darf eine Webseite die Installation nicht selbst auslösen; dort erklärt der Hinweis die
+// Schritte. Android und Chrome bieten ein echtes Installieren-Fenster (beforeinstallprompt).
+const SHARE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>';
+const isStandalone = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isMacSafari = !isIOS && /Macintosh/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent)
+  && !/Chrome|Chromium|Edg|OPR|Firefox/.test(navigator.userAgent);
+let installPrompt = null;
+
+function showInstallHint(html, withButton = false) {
+  if (isStandalone || load("installHintDismissed", false)) return;
+  $("installText").innerHTML = html;
+  $("installBtn").hidden = !withButton;
+  $("installHint").hidden = false;
+}
+function hideInstallHint() { $("installHint").hidden = true; }
+
+$("installClose").onclick = () => { store("installHintDismissed", true); hideInstallHint(); };
+$("installBtn").onclick = async () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  await installPrompt.userChoice.catch(() => {});
+  installPrompt = null;
+  hideInstallHint();
+};
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  installPrompt = e;
+  showInstallHint("<strong>Umrechner als App installieren</strong> – startet schneller und funktioniert offline.", true);
+});
+window.addEventListener("appinstalled", hideInstallHint);
+
+if (isIOS) {
+  showInstallHint(`<strong>Als App installieren:</strong> in Safari unten auf ≡ tippen, dann ${SHARE_ICON} „Teilen“ → „Zum Home-Bildschirm“.`);
+} else if (isMacSafari) {
+  showInstallHint("<strong>Als App ins Dock:</strong> in der Menüleiste Ablage → „Zum Dock hinzufügen“.");
+}
+
 // Updates: iOS lässt Home-Bildschirm-Apps im Hintergrund weiterlaufen, „wieder öffnen“ lädt sie nicht neu.
 // Deshalb bei jedem Zurückholen nach einer neuen Version fragen; ist eine da, startet die App neu.
 if ("serviceWorker" in navigator) {

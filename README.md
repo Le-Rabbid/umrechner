@@ -5,6 +5,7 @@ Währungsrechner als Web-App (PWA) mit den Referenzkursen der Europäischen Zent
 - Kurstabelle mit runden Beträgen; wischen oder ← → für ×10 / ÷10, Zeile antippen für Zwischenwerte
 - ↻ lädt neue Kurse; ohne Verbindung gelten die zuletzt gespeicherten (mit Hinweis)
 - Standort-Knopf stellt die Landeswährung ein (siehe „Landeserkennung“)
+- Im Browser blendet die Seite einen Hinweis zum Installieren ein (iPhone: Schritt-für-Schritt-Anleitung, Android/Chrome: Installieren-Knopf); mit ✕ dauerhaft ausblendbar
 
 Kurse: [frankfurter.dev](https://frankfurter.dev) (EZB-Daten, kostenlos, ohne Schlüssel).
 
