@@ -51,6 +51,8 @@ body {
 .app {
   position: fixed;
   inset: 0;
+  /* Ausgleich für iOS-Home-Bildschirm-Apps, die eine zu kleine Fensterhöhe melden (siehe fitToScreen). */
+  bottom: calc(-1 * var(--missing-height, 0px));
   margin-inline: auto;
   width: 100%;
   max-width: 440px;
@@ -220,6 +222,18 @@ button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px sol
 .option .flag { font-size: 22px; }
 .option .name { color: var(--muted); font-size: 12px; display: block; }
 .option .check { margin-left: auto; color: var(--accent); }
+
+/* Info-Fenster: Quellen, KI-Hinweis, Datenschutz, Haftung */
+#infoBtn { color: var(--muted); font-size: 16px; width: 34px; height: 34px; }
+.info-body { overflow-y: auto; padding-bottom: 20px; font-size: 14px; line-height: 1.55; color: var(--text); -webkit-user-select: text; user-select: text; }
+.info-body h3 { margin: 18px 0 6px; font-size: 13px; font-weight: 600; color: var(--accent); letter-spacing: 0.04em; text-transform: uppercase; }
+.info-body h3:first-child { margin-top: 0; }
+.info-body p, .info-body ul { margin: 0 0 8px; }
+.info-body ul { padding-left: 18px; }
+.info-body li { margin-bottom: 4px; }
+.info-body a { color: var(--accent); }
+.info-body .small { color: var(--muted); font-size: 12px; }
+.footer .link-btn { background: none; border: 0; padding: 0; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
 @media (prefers-reduced-motion: no-preference) {
   .row, .banner { transition: background 0.15s; }
   .refresh.busy { animation: spin 1s linear infinite; }
@@ -241,6 +255,7 @@ button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px sol
     <button class="chip" id="toBtn" aria-label="Zielwährung ändern"></button>
   </header>
   <div class="stand">
+    <button class="icon-btn" id="infoBtn" aria-label="Info, Quellen und Haftung" title="Info, Quellen und Haftung">ⓘ</button>
     <span id="standText"></span>
     <button class="icon-btn refresh" id="refreshBtn" aria-label="Kurse aktualisieren" title="Kurse aktualisieren">↻</button>
   </div>
@@ -254,6 +269,41 @@ button:focus-visible, input:focus-visible, .row:focus-visible { outline: 2px sol
       <div class="hint">wischen oder ← →</div>
     </div>
     <button class="icon-btn" id="upBtn" aria-label="Beträge mal zehn" title="×10 (→)">›</button>
+  </div>
+</div>
+
+<div class="picker" id="infoPanel" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="infoTitle">
+    <div class="sheet-head">
+      <h2 id="infoTitle">Über den Umrechner</h2>
+      <button class="icon-btn" id="closeInfo" aria-label="Schließen">✕</button>
+    </div>
+    <div class="info-body">
+      <h3>Mit KI erstellt</h3>
+      <p>Der gesamte Code dieser App, das Icon und alle Texte wurden von <strong>Claude</strong>, einem KI-Modell von <a href="https://www.anthropic.com" target="_blank" rel="noopener">Anthropic</a>, erstellt. Anforderungen und Gestaltung hat der Betreiber vorgegeben und die Ergebnisse geprüft.</p>
+
+      <h3>Quellen und Rechte</h3>
+      <ul>
+        <li><strong>Wechselkurse:</strong> Referenzkurse der Europäischen Zentralbank, abgerufen über <a href="https://frankfurter.dev" target="_blank" rel="noopener">frankfurter.dev</a> (Open Source, frei nutzbar).</li>
+        <li><strong>Landesgrenzen (Offline-Erkennung):</strong> <a href="https://www.naturalearthdata.com" target="_blank" rel="noopener">Natural Earth</a>, gemeinfrei, für diese App vereinfacht.</li>
+        <li><strong>Land aus dem Standort (online):</strong> <a href="https://www.bigdatacloud.com" target="_blank" rel="noopener">BigDataCloud</a>, kostenlose Schnittstelle.</li>
+        <li><strong>Flaggen:</strong> Emoji-Zeichen, die dein Gerät mit seiner eigenen Schrift darstellt.</li>
+        <li><strong>Quellcode:</strong> <a href="https://github.com/Le-Rabbid/umrechner" target="_blank" rel="noopener">github.com/Le-Rabbid/umrechner</a></li>
+      </ul>
+
+      <h3>Datenschutz</h3>
+      <ul>
+        <li>Einstellungen und gespeicherte Kurse bleiben auf deinem Gerät. Es gibt kein Konto, keine Werbung und keine Analyse.</li>
+        <li>Beim Laden der Kurse erfährt frankfurter.dev deine IP-Adresse.</li>
+        <li>Nur wenn du den Standort-Knopf nutzt und online bist, gehen deine IP-Adresse und die auf etwa 1 km gerundete Position an BigDataCloud. Ohne Standortfreigabe wird die Zeitzone verwendet, dabei verlässt nichts das Gerät.</li>
+        <li>Die Seite liegt bei GitHub Pages; GitHub verarbeitet dabei technisch bedingt IP-Adressen.</li>
+      </ul>
+
+      <h3>Haftungsausschluss</h3>
+      <p>Alle Angaben ohne Gewähr. Die Kurse sind Referenzkurse der EZB, werden in der Regel einmal pro Werktag veröffentlicht und können veraltet oder fehlerhaft sein. Banken, Wechselstuben und Kartenanbieter rechnen mit eigenen Kursen und Gebühren. Die App dient nur der Orientierung und ist keine Finanzberatung. Für Schäden, die aus der Nutzung entstehen, wird keine Haftung übernommen, soweit gesetzlich zulässig.</p>
+
+      <p class="small" id="appVersion"></p>
+    </div>
   </div>
 </div>
 
@@ -321,8 +371,12 @@ function render() {
   $("fromBtn").innerHTML = `<span class="flag">${flag(state.from)}</span>${state.from}<span class="chev">▾</span>`;
   $("toBtn").innerHTML = `<span class="flag">${flag(state.to)}</span>${state.to}<span class="chev">▾</span>`;
 
-  $("standText").textContent = `Kurse vom ${formatDate(state.rates.date)}`
-    + (state.rates.fetchedAt ? ` · abgerufen ${formatDate(state.rates.fetchedAt, true)}` : "");
+  // Kurz und in Zahlen, damit die Zeile auch auf kleinen iPhones neben die Knöpfe passt.
+  const ecbDate = new Date(state.rates.date + "T12:00:00").toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const fetched = state.rates.fetchedAt
+    ? new Date(state.rates.fetchedAt).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+    : null;
+  $("standText").textContent = `Kurse vom ${ecbDate}` + (fetched ? ` · abgerufen ${fetched}` : "");
 
   // Warnung, solange nicht mit aktuellen Kursen gerechnet wird.
   const banner = $("banner");
@@ -347,7 +401,7 @@ function render() {
       for (let j = 1; j < 10; j++) html += row(v + (j * state.scale) / 10, r, true);
     }
   }
-  html += `<div class="footer">${r ? `1 ${state.from} = ${nf(4).format(r)} ${state.to}<br>` : ""}Kurse: Europäische Zentralbank über <a href="https://frankfurter.dev" target="_blank" rel="noopener">frankfurter.dev</a><br>Code geschrieben von Claude, einer KI von Anthropic</div>`;
+  html += `<div class="footer">${r ? `1 ${state.from} = ${nf(4).format(r)} ${state.to}<br>` : ""}Kurse: Europäische Zentralbank über <a href="https://frankfurter.dev" target="_blank" rel="noopener">frankfurter.dev</a><br>Code geschrieben von Claude, einer KI von Anthropic<br><button class="link-btn" data-open-info>Info, Quellen und Haftung</button></div>`;
   $("table").innerHTML = html;
 
   $("scaleLabel").textContent = `Schritte à ${plain.format(state.scale)}`;
@@ -413,6 +467,7 @@ $("app").addEventListener("touchend", (e) => {
   if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) setScale(dx < 0 ? 10 : 0.1);
 });
 document.addEventListener("keydown", (e) => {
+  if (!$("infoPanel").hidden) { if (e.key === "Escape") closeInfo(); return; }
   if (!$("picker").hidden) { if (e.key === "Escape") closePicker(); return; }
   if (e.key === "ArrowRight") setScale(10);
   if (e.key === "ArrowLeft") setScale(0.1);
@@ -432,6 +487,17 @@ function openPicker(target) {
   $("search").focus();
 }
 function closePicker() { $("picker").hidden = true; state.picking = null; }
+
+function openInfo() {
+  $("infoPanel").hidden = false;
+  $("closeInfo").focus();
+}
+function closeInfo() { $("infoPanel").hidden = true; }
+$("infoBtn").onclick = openInfo;
+$("closeInfo").onclick = closeInfo;
+$("infoPanel").addEventListener("click", (e) => { if (e.target.id === "infoPanel") closeInfo(); });
+$("table").addEventListener("click", (e) => { if (e.target.closest("[data-open-info]")) openInfo(); });
+caches?.keys?.().then((keys) => { $("appVersion").textContent = `Version: ${keys.find((k) => k.startsWith("umrechner-")) || "–"}`; }).catch(() => {});
 function renderOptions() {
   const q = $("search").value.trim().toLowerCase();
   const list = currencies();
@@ -626,6 +692,21 @@ $("refreshBtn").onclick = () => refresh({ manual: true });
 window.addEventListener("online", () => refresh());
 window.addEventListener("offline", render);
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") refreshIfStale(); });
+
+// iOS meldet Home-Bildschirm-Apps mit durchsichtiger Statusleiste eine Fensterhöhe ohne die Statusleiste,
+// zeichnet sie aber ab der obersten Bildschirmkante – unten bliebe ein leerer Streifen. Die fehlende Höhe
+// wird gemessen und ausgeglichen; im Browser oder wenn nichts fehlt, bleibt der Ausgleich 0.
+function fitToScreen() {
+  const standalone = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
+  const portrait = matchMedia("(orientation: portrait)").matches;
+  const screenHeight = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+  const missing = Math.round(screenHeight - window.innerHeight);
+  const valid = standalone && missing > 0 && missing <= 100;
+  document.documentElement.style.setProperty("--missing-height", valid ? `${missing}px` : "0px");
+}
+window.addEventListener("resize", fitToScreen);
+window.addEventListener("orientationchange", () => setTimeout(fitToScreen, 300));
+fitToScreen();
 
 render();
 refreshIfStale();
