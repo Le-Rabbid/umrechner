@@ -2,7 +2,7 @@
 // Service Worker: speichert die App-Dateien, damit der Umrechner auch ohne Internet startet.
 // Die Kurse selbst verwaltet die App (localStorage); Anfragen an die Kurs-API laufen hier nicht durch.
 // Bei jeder Änderung an den App-Dateien VERSION erhöhen, damit installierte Apps das Update laden.
-const VERSION = "umrechner-v8";
+const VERSION = "umrechner-v9";
 const FILES = [
   "./",
   "./index.html",
